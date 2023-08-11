@@ -1,0 +1,60 @@
+version: '3'
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
+
+  db:
+    image: mysql:5.7
+    environment:
+      MYSQL_DATABASE: celery
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: password
+    ports:
+      - "3307:3306"
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  worker:
+    build: .
+    command: "celery -A tasks worker -Q fake_scraper,fake_post_data,waiter_queue --loglevel=info --concurrency=1"
+    environment:
+      CELERY_BROKER_URL: amqp://user:password@rabbitmq:5672
+      CELERY_RESULT_BACKEND: db+mysql+pymysql://user:password@db:3306/celery
+      environment: prod
+      AWS_ACCESS_KEY_ID: AKIAUQVGL2JEH4CNHCEN
+      AWS_SECRET_ACCESS_KEY: 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
+      AWS_DEFAULT_REGION: us-east-1
+      #CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      - rabbitmq
+      - db
+
+  playground:
+    image: celery_singleton_playground
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: /bin/sh -c "while sleep 1000; do :; done"
+    environment:
+      CELERY_BROKER_URL: amqp://user:password@rabbitmq:5672
+      CELERY_RESULT_BACKEND: db+mysql+pymysql://user:password@db:3306/celery
+      environment: prod
+      AWS_ACCESS_KEY_ID: AKIAUQVGL2JEH4CNHCEN
+      AWS_SECRET_ACCESS_KEY: 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
+      AWS_DEFAULT_REGION: us-east-1
+      #CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      - rabbitmq
+      - db
+    volumes:
+      - .:/workspaces/celery-singleton
